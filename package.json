@@ -1,0 +1,29 @@
+{
+  "name": "pixelization_back",
+  "version": "0.0.1",
+  "description": "API for Web-based pixel art converter / tool",
+  "keywords": [
+    "nodejs",
+    "pixel art"
+  ],
+  "license": "ISC",
+  "author": "parkcorner",
+  "type": "module",
+  "main": "app.ts",
+  "scripts": {
+    "test": "test",
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.6",
+    "express": "^5.2.1",
+    "formidable": "^3.5.4",
+    "sharp": "^0.35.3"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
+    "@types/formidable": "^3.5.1",
+    "@types/node": "^26.1.1"
+  }
+}
