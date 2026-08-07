@@ -3,13 +3,15 @@ import formidable, {errors as formidableErrors} from 'formidable';
 import sharp from 'sharp';
 const router = express.Router();
 
-const min = 256;
-
 router.post('/convert', async (req: Request, res: Response) => {
     const form = formidable({})
 
     try {
         const [fields, files] = await form.parse(req);
+
+        // console.log('fields', fields);
+
+        const { pixelSize } = fields;
 
         if (!files.file) {
             res.status(400).send('No file uploaded');
@@ -20,6 +22,24 @@ router.post('/convert', async (req: Request, res: Response) => {
             // Handle the uploaded file here
 
             // Read the metadata from the image file
+
+            let min = 0
+
+            switch(Number(pixelSize)){
+                case 2:
+                    min = 256;
+                break;
+                case 4:
+                    min = 128;
+                break;
+                case 6:
+                    min = 64;
+                break;
+                case 8:
+                    min = 32;
+                break;
+            }
+
             const metadata = await sharp(files.file[0].filepath).metadata();
             
             // Destructure width and height
