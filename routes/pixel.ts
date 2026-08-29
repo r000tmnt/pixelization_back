@@ -53,11 +53,13 @@ router.post('/convert', async (req: Request, res: Response) => {
             
             console.log(`Width: ${width}px, Height: ${height}px`);
 
-            const aspectRatioW = width / height;
-            const aspectRatioH = height / width;
-
-            const newWidth = Math.round(min * aspectRatioW)
-            const newHeight = aspectRatioH > 1? min : Math.round(min * aspectRatioH)
+            const isLandscape = width >= height;
+            const newWidth = isLandscape
+                ? min
+                : Math.max(1, Math.round(min * (width / height)));
+            const newHeight = isLandscape
+                ? Math.max(1, Math.round(min * (height / width)))
+                : min;
 
             if(palette && palette[0] && palette[0] !== 'original'){
                 // console.log(palette)
