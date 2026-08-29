@@ -2,10 +2,8 @@ import express, { type Express, type Request, type Response } from 'express';
 import formidable, {errors as formidableErrors} from 'formidable';
 import sharp from 'sharp';
 import palettes from '../config/palette.ts';
-import colorluminance from 'color-luminance'
+import { getClosestColorIndex } from '../utils/color.ts';
 // import fs from 'fs'
-
-// import { getClosestColorIndex } from '../utils/color.ts'
 
 const router = express.Router();
 
@@ -49,7 +47,7 @@ router.post('/convert', async (req: Request, res: Response) => {
             const metadata = await sharp(files.file[0].filepath).metadata();
             
             // Destructure width and height
-            const { width, height, channels } = metadata;
+            const { width, height } = metadata;
             
             console.log(`Width: ${width}px, Height: ${height}px`);
 
@@ -76,63 +74,56 @@ router.post('/convert', async (req: Request, res: Response) => {
 
                 console.log('rawBytes', rawBytes.info)
 
-                // Get luminance of the palette
-                const palletLuminance = color.map(p => {
-                    return colorluminance(p)
-                })
+                const { width: outputWidth, height: outputHeight, channels: outputChannels } = rawBytes.info;
+                const workingPixels = Float32Array.from(rawBytes.data);
+                const ditherStrength = 0.35;
 
-                // console.log('palletLuminance', palletLuminance)
+                const channelOffset = (x: number, y: number) =>
+                    (y * outputWidth + x) * outputChannels;
 
-                let changed = 0
+                const clampChannel = (value: number) => Math.max(0, Math.min(255, value));
 
-                console.log(`${rawBytes.data[0]}, ${rawBytes.data[1]}, ${rawBytes.data[2]}`)
+                // Floyd-Steinberg dithering carries the colour not represented by one
+                // palette pixel into neighbouring unprocessed pixels.
+                for (let y = 0; y < outputHeight; y++) {
+                    for (let x = 0; x < outputWidth; x++) {
+                        const offset = channelOffset(x, y);
 
-                for (let i = 0; i < rawBytes.data.length; i += 4) {
-                    const r = rawBytes.data[i] 
-                    const g = rawBytes.data[i + 1] 
-                    const b = rawBytes.data[i + 2] 
-                    const lu = colorluminance(r, g, b)
+                        // Preserve fully transparent pixels and do not dither into them.
+                        if (rawBytes.data[offset + 3] === 0) continue;
 
-                    // console.log('lu', lu)
+                        const r = clampChannel(workingPixels[offset]);
+                        const g = clampChannel(workingPixels[offset + 1]);
+                        const b = clampChannel(workingPixels[offset + 2]);
+                        const colorIndex = getClosestColorIndex({ palette: color, r, g, b });
+                        const colorSelect = color[colorIndex];
+                        const errorR = r - colorSelect[0];
+                        const errorG = g - colorSelect[1];
+                        const errorB = b - colorSelect[2];
 
-                    // rawBytes.data[i] = 255
-                    // rawBytes.data[i + 1] = 100
-                    // rawBytes.data[i + 2] = 100      
-                    // rawBytes.data[i + 3] = 255      
+                        rawBytes.data[offset] = colorSelect[0];
+                        rawBytes.data[offset + 1] = colorSelect[1];
+                        rawBytes.data[offset + 2] = colorSelect[2];
 
-                    // changed++
+                        const distributeError = (targetX: number, targetY: number, weight: number) => {
+                            if (targetX < 0 || targetX >= outputWidth || targetY >= outputHeight) return;
 
-                    // Find the closest color
-                    // let colorIndex = getClosestColorIndex({ palette: color, r, g, b })
-                    
-                    const dist = palletLuminance.map(p => Math.abs(p - lu))
+                            const targetOffset = channelOffset(targetX, targetY);
+                            if (rawBytes.data[targetOffset + 3] === 0) return;
 
-                    const minDist = Math.min(...dist)
+                            workingPixels[targetOffset] += errorR * weight * ditherStrength;
+                            workingPixels[targetOffset + 1] += errorG * weight * ditherStrength;
+                            workingPixels[targetOffset + 2] += errorB * weight * ditherStrength;
+                        };
 
-                    const colorIndex = dist.findIndex(d => d === minDist)
-
-                    const colorSelect = color[colorIndex]
-
-                    // console.log('colorSelect', colorSelect)
-
-
-                    // if (r !== colorSelect[0] || g !== colorSelect[1] || b !== colorSelect[2]) {
-                    //     changed++;
-                    // }
-
-                    rawBytes.data[i] = colorSelect[0]
-                    rawBytes.data[i + 1] = colorSelect[1]
-                    rawBytes.data[i + 2] = colorSelect[2]              
-                    // rawBytes.data[i + 3] = 255         
+                        distributeError(x + 1, y, 7 / 16);
+                        distributeError(x - 1, y + 1, 3 / 16);
+                        distributeError(x, y + 1, 5 / 16);
+                        distributeError(x + 1, y + 1, 1 / 16);
+                    }
                 }
 
-                console.log('changed', changed)
-                console.log("total pixels:", rawBytes.data.length / 4);
-
-                console.log('done')
-                console.log(`${rawBytes.data[0]}, ${rawBytes.data[1]}, ${rawBytes.data[2]}`)
-
-                const output = await sharp(rawBytes.data, {
+                await sharp(rawBytes.data, {
                     raw: {
                         width: rawBytes.info.width,
                         height: rawBytes.info.height,
