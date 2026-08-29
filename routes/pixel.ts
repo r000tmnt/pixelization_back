@@ -15,7 +15,7 @@ router.post('/convert', async (req: Request, res: Response) => {
 
         // console.log('fields', fields);
 
-        const { pixelSize, palette } = fields;
+        const { pixelSize, palette, ditherStrength } = fields;
 
         if (!files.file) {
             res.status(400).send('No file uploaded');
@@ -52,9 +52,11 @@ router.post('/convert', async (req: Request, res: Response) => {
             console.log(`Width: ${width}px, Height: ${height}px`);
 
             const isLandscape = width >= height;
+
             const newWidth = isLandscape
                 ? min
                 : Math.max(1, Math.round(min * (width / height)));
+
             const newHeight = isLandscape
                 ? Math.max(1, Math.round(min * (height / width)))
                 : min;
@@ -75,8 +77,18 @@ router.post('/convert', async (req: Request, res: Response) => {
                 console.log('rawBytes', rawBytes.info)
 
                 const { width: outputWidth, height: outputHeight, channels: outputChannels } = rawBytes.info;
+
                 const workingPixels = Float32Array.from(rawBytes.data);
-                const ditherStrength = 0.35;
+
+                if(!ditherStrength) return 
+
+                let ditherLevel = Number(ditherStrength)
+
+                if(ditherLevel > 1 || ditherLevel < 0) ditherLevel = 0.35
+
+                //     ditheringStrength = Number()
+
+                // const ditherStrength = 0.35;
 
                 const channelOffset = (x: number, y: number) =>
                     (y * outputWidth + x) * outputChannels;
@@ -111,9 +123,9 @@ router.post('/convert', async (req: Request, res: Response) => {
                             const targetOffset = channelOffset(targetX, targetY);
                             if (rawBytes.data[targetOffset + 3] === 0) return;
 
-                            workingPixels[targetOffset] += errorR * weight * ditherStrength;
-                            workingPixels[targetOffset + 1] += errorG * weight * ditherStrength;
-                            workingPixels[targetOffset + 2] += errorB * weight * ditherStrength;
+                            workingPixels[targetOffset] += errorR * weight * ditherLevel;
+                            workingPixels[targetOffset + 1] += errorG * weight * ditherLevel;
+                            workingPixels[targetOffset + 2] += errorB * weight * ditherLevel;
                         };
 
                         distributeError(x + 1, y, 7 / 16);
