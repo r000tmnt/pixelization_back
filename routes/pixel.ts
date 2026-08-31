@@ -2,7 +2,7 @@ import express, { type Express, type Request, type Response } from 'express';
 import formidable, {errors as formidableErrors} from 'formidable';
 import sharp from 'sharp';
 import palettes from '../config/palette.ts';
-import { getClosestColorIndex } from '../utils/color.ts';
+import { errorDiffusion, ordered } from '../utils/dithering.ts';
 // import fs from 'fs'
 
 const router = express.Router();
@@ -15,7 +15,7 @@ router.post('/convert', async (req: Request, res: Response) => {
 
         // console.log('fields', fields);
 
-        const { pixelSize, palette, ditherStrength } = fields;
+        const { pixelSize, palette, ditherStrength, ditherStyle } = fields;
 
         if (!files.file) {
             res.status(400).send('No file uploaded');
@@ -69,7 +69,9 @@ router.post('/convert', async (req: Request, res: Response) => {
                 console.log(color)
 
                 const rawBytes = await sharp(files.file[0].filepath)
-                .resize({ width: newWidth, height: newHeight, kernel: sharp.kernel.nearest })
+                // .resize({ width: newWidth, height: newHeight, kernel: sharp.kernel.nearest })
+                // .resize({ width: newWidth, height: newHeight, kernel: sharp.kernel.lanczos3 })
+                .resize({ width: newWidth, height: newHeight, kernel: sharp.kernel.cubic })
                 .ensureAlpha()
                 .raw()
                 .toBuffer({ resolveWithObject: true });
@@ -78,64 +80,30 @@ router.post('/convert', async (req: Request, res: Response) => {
 
                 const { width: outputWidth, height: outputHeight, channels: outputChannels } = rawBytes.info;
 
-                const workingPixels = Float32Array.from(rawBytes.data);
+                const style = ditherStyle? ditherStyle[0] : 'errorDiffusion'
 
-                if(!ditherStrength) return 
+                let result: Buffer<ArrayBuffer>
 
-                let ditherLevel = Number(ditherStrength)
-
-                if(ditherLevel > 1 || ditherLevel < 0) ditherLevel = 0.35
-
-                //     ditheringStrength = Number()
-
-                // const ditherStrength = 0.35;
-
-                const channelOffset = (x: number, y: number) =>
-                    (y * outputWidth + x) * outputChannels;
-
-                const clampChannel = (value: number) => Math.max(0, Math.min(255, value));
-
-                // Floyd-Steinberg dithering carries the colour not represented by one
-                // palette pixel into neighbouring unprocessed pixels.
-                for (let y = 0; y < outputHeight; y++) {
-                    for (let x = 0; x < outputWidth; x++) {
-                        const offset = channelOffset(x, y);
-
-                        // Preserve fully transparent pixels and do not dither into them.
-                        if (rawBytes.data[offset + 3] === 0) continue;
-
-                        const r = clampChannel(workingPixels[offset]);
-                        const g = clampChannel(workingPixels[offset + 1]);
-                        const b = clampChannel(workingPixels[offset + 2]);
-                        const colorIndex = getClosestColorIndex({ palette: color, r, g, b });
-                        const colorSelect = color[colorIndex];
-                        const errorR = r - colorSelect[0];
-                        const errorG = g - colorSelect[1];
-                        const errorB = b - colorSelect[2];
-
-                        rawBytes.data[offset] = colorSelect[0];
-                        rawBytes.data[offset + 1] = colorSelect[1];
-                        rawBytes.data[offset + 2] = colorSelect[2];
-
-                        const distributeError = (targetX: number, targetY: number, weight: number) => {
-                            if (targetX < 0 || targetX >= outputWidth || targetY >= outputHeight) return;
-
-                            const targetOffset = channelOffset(targetX, targetY);
-                            if (rawBytes.data[targetOffset + 3] === 0) return;
-
-                            workingPixels[targetOffset] += errorR * weight * ditherLevel;
-                            workingPixels[targetOffset + 1] += errorG * weight * ditherLevel;
-                            workingPixels[targetOffset + 2] += errorB * weight * ditherLevel;
-                        };
-
-                        distributeError(x + 1, y, 7 / 16);
-                        distributeError(x - 1, y + 1, 3 / 16);
-                        distributeError(x, y + 1, 5 / 16);
-                        distributeError(x + 1, y + 1, 1 / 16);
-                    }
+                if(style === 'errorDiffusion'){
+                    result = await errorDiffusion({
+                        color,
+                        rawData: rawBytes.data,
+                        width: outputWidth,
+                        height: outputHeight,
+                        strength: Number(ditherStrength),
+                        channels: outputChannels
+                    })
+                }else{
+                    result = await ordered({
+                        color,
+                        rawData: rawBytes.data,
+                        width: outputWidth,
+                        height: outputHeight,               
+                        channels: outputChannels         
+                    })
                 }
 
-                await sharp(rawBytes.data, {
+                await sharp(result, {
                     raw: {
                         width: rawBytes.info.width,
                         height: rawBytes.info.height,
