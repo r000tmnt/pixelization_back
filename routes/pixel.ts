@@ -2,7 +2,11 @@ import express, { type Express, type Request, type Response } from 'express';
 import formidable, {errors as formidableErrors} from 'formidable';
 import sharp from 'sharp';
 import palettes from '../config/palette.ts';
-import { errorDiffusion, ordered } from '../utils/dithering.ts';
+import { 
+    fsDithering, 
+    baDithering,
+    ordered 
+} from '../utils/dithering.ts';
 // import fs from 'fs'
 
 const router = express.Router();
@@ -66,12 +70,12 @@ router.post('/convert', async (req: Request, res: Response) => {
 
                 const color = palettes[palette[0]]
 
-                console.log(color)
+                // console.log(color)
 
                 const rawBytes = await sharp(files.file[0].filepath)
                 // .resize({ width: newWidth, height: newHeight, kernel: sharp.kernel.nearest })
                 // .resize({ width: newWidth, height: newHeight, kernel: sharp.kernel.lanczos3 })
-                .resize({ width: newWidth, height: newHeight, kernel: sharp.kernel.cubic })
+                .resize({ width: newWidth, height: newHeight, fit: 'inside', kernel: sharp.kernel.lanczos3 })
                 .ensureAlpha()
                 .raw()
                 .toBuffer({ resolveWithObject: true });
@@ -84,23 +88,46 @@ router.post('/convert', async (req: Request, res: Response) => {
 
                 let result: Buffer<ArrayBuffer>
 
-                if(style === 'errorDiffusion'){
-                    result = await errorDiffusion({
-                        color,
-                        rawData: rawBytes.data,
-                        width: outputWidth,
-                        height: outputHeight,
-                        strength: Number(ditherStrength),
-                        channels: outputChannels
-                    })
-                }else{
-                    result = await ordered({
-                        color,
-                        rawData: rawBytes.data,
-                        width: outputWidth,
-                        height: outputHeight,               
-                        channels: outputChannels         
-                    })
+                switch(style){
+                    case 'default':
+                        result = await fsDithering({
+                            color,
+                            rawData: rawBytes.data,
+                            width: outputWidth,
+                            height: outputHeight,
+                            strength: Number(ditherStrength),
+                            channels: outputChannels
+                        })                        
+                    break;
+                    case 'matted':
+                        result = await baDithering({
+                            color,
+                            rawData: rawBytes.data,
+                            width: outputWidth,
+                            height: outputHeight,
+                            strength: Number(ditherStrength),
+                            channels: outputChannels
+                        })                            
+                    break;
+                    case 'grid':
+                        result = await ordered({
+                            color,
+                            rawData: rawBytes.data,
+                            width: outputWidth,
+                            height: outputHeight,               
+                            channels: outputChannels         
+                        })                        
+                    break;
+                    default:
+                        result = await fsDithering({
+                            color,
+                            rawData: rawBytes.data,
+                            width: outputWidth,
+                            height: outputHeight,
+                            strength: Number(ditherStrength),
+                            channels: outputChannels
+                        })                          
+                    break;
                 }
 
                 await sharp(result, {
