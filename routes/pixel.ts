@@ -12,6 +12,8 @@ import {
 const router = express.Router();
 
 router.post('/convert', async (req: Request, res: Response) => {
+    sharp.cache(false);
+
     const form = formidable({})
 
     try {
@@ -72,7 +74,7 @@ router.post('/convert', async (req: Request, res: Response) => {
 
                 // console.log(color)
 
-                const rawBytes = await sharp(files.file[0].filepath)
+                const rawBytes = await sharp(files.file[0].filepath, { failOn: 'none' })
                 // .resize({ width: newWidth, height: newHeight, kernel: sharp.kernel.nearest })
                 // .resize({ width: newWidth, height: newHeight, kernel: sharp.kernel.lanczos3 })
                 .resize({ width: newWidth, height: newHeight, fit: 'inside', kernel: sharp.kernel.lanczos3 })
@@ -148,7 +150,6 @@ router.post('/convert', async (req: Request, res: Response) => {
 
                     res.status(200).send({ data: url, width: newWidth, height: newHeight });
                 });                   
-
                 
                 // await fs.promises.writeFile("test.png", output);
             }else{
