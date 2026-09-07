@@ -117,7 +117,8 @@ router.post('/convert', async (req: Request, res: Response) => {
                             rawData: rawBytes.data,
                             width: outputWidth,
                             height: outputHeight,               
-                            channels: outputChannels         
+                            channels: outputChannels,
+                            strength: Number(ditherStrength),         
                         })                        
                     break;
                     default:
