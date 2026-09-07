@@ -1,18 +1,7 @@
 import { getClosestColorIndex } from './color.ts';
 
 //bayerMatrix 
-const bayerMatrix_8x8 = [
-    [ 0, 32,  8, 40,  2, 34, 10, 42],
-    [48, 16, 56, 24, 50, 18, 58, 26],
-    [12, 44,  4, 36, 14, 46,  6, 38],
-    [60, 28, 52, 20, 62, 30, 54, 22],
-    [ 3, 35, 11, 43,  1, 33,  9, 41],
-    [51, 19, 59, 27, 49, 17, 57, 25],
-    [15, 47,  7, 39, 13, 45,  5, 37],
-    [63, 31, 55, 23, 61, 29, 53, 21],
-];
-
-const spread = 255 / 64;   
+import matrix from '../config/matrix.ts';
 
 const channelOffset = (x: number, y: number, outputWidth: number, outputChannels: number) =>
     (y * outputWidth + x) * outputChannels;
@@ -142,9 +131,10 @@ const ordered = async(payload: {
     rawData: Buffer<ArrayBuffer>, 
     width: number, 
     height: number,
-    channels: number
+    channels: number,
+    strength: number
 }) => {
-    const { color, rawData, width, height, channels } = payload
+    const { color, rawData, width, height, channels, strength } = payload
 
     for (let y = 0; y < height; y++) {
         for (let x = 0; x < width; x++) {
@@ -152,10 +142,15 @@ const ordered = async(payload: {
 
             // Preserve fully transparent pixels and do not dither into them.
             if (rawData[offset + 3] === 0) continue;
+            
 
-            // 1. Get matrix value (0 to 63) and map it to a central bias (-128 to 128 scale)
-            const matrixValue = bayerMatrix_8x8[y % 8][x % 8];
-            const bias = (matrixValue - 31.5) * spread;
+            // 1. Get matrix value (0 to max) and map it to a central bias (-128 to 128 scale)
+            const config = matrix[String(strength) as keyof typeof matrix];
+            const matrixValue = config.map[y % strength][x % strength];
+            const maxColor = ((strength * strength) - 1) / 2
+            const bias = (matrixValue - maxColor) * config.spread;
+
+            console.log(`maxColor Value: ${maxColor}, Bias: ${bias}`);
 
             // 2. Apply dither bias to the raw pixel channels
             // Clamp between 0-255 so we don't blow out color math
