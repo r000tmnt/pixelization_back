@@ -21,7 +21,13 @@ router.post('/convert', async (req: Request, res: Response) => {
 
         // console.log('fields', fields);
 
-        const { pixelSize, palette, ditherStrength, ditherStyle } = fields;
+        const { 
+            pixelSize, 
+            palette, 
+            ditherStrength, 
+            ditherStyle,
+            customColors 
+        } = fields;
 
         if (!files.file) {
             res.status(400).send('No file uploaded');
@@ -70,7 +76,24 @@ router.post('/convert', async (req: Request, res: Response) => {
             if(palette && palette[0] && palette[0] !== 'original'){
                 // console.log(palette)
 
-                const color = palettes[palette[0]]
+                let color : number[][] = []
+                
+                // if(customColors && customColors[0]){
+                
+                console.log('customColors', customColors)
+
+                if(customColors && customColors[0]){
+                    const customColorsArray = customColors[0].split(';').map((hex: string) => {
+                        // Parse the hex substrings into base-10 integers
+                        const r = parseInt(hex.substring(1, 3), 16);
+                        const g = parseInt(hex.substring(3, 5), 16);
+                        const b = parseInt(hex.substring(5, 7), 16);
+
+                        color.push([r, g, b]);
+                    })
+                }else{
+                    color = palettes[palette[0]]
+                }
 
                 // console.log(color)
 
