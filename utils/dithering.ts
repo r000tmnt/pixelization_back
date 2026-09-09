@@ -150,7 +150,7 @@ const ordered = async(payload: {
             const maxColor = ((strength * strength) - 1) / 2
             const bias = (matrixValue - maxColor) * config.spread;
 
-            console.log(`maxColor Value: ${maxColor}, Bias: ${bias}`);
+            // console.log(`maxColor Value: ${maxColor}, Bias: ${bias}`);
 
             // 2. Apply dither bias to the raw pixel channels
             // Clamp between 0-255 so we don't blow out color math
