@@ -10,9 +10,9 @@ const port = Number(process.env.PORT) || 3030;
 app.use(cors());
 app.use('/pixel', pixelRouter);
 
-app.get('/', (req: Request, res: Response) => {
-  // res.send('Hello World!');
-  res.redirect('http://localhost:5173/')
+app.get('/healthCheck', (req: Request, res: Response) => {
+  res.send('OK');
+  // res.redirect('http://localhost:5173/')
 });
 
 app.use((req, res, next) => {
