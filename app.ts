@@ -1,5 +1,6 @@
 import express, { type Express, type Request, type Response } from 'express';
 import cors from 'cors';
+import env from 'dotenv/config'
 import pixelRouter from './routes/pixel.ts';
 
 const app: Express = express();
