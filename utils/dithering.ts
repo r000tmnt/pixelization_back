@@ -3,6 +3,9 @@ import { getClosestColorIndex } from './color.ts';
 //bayerMatrix 
 import matrix from '../config/matrix.ts';
 
+// OpenCV
+import { getOpenCv } from '../lib/opencv.js'
+
 const channelOffset = (x: number, y: number, outputWidth: number, outputChannels: number) =>
     (y * outputWidth + x) * outputChannels;
 
@@ -19,6 +22,30 @@ const fsDithering = async(payload: {
     const { color, rawData, width, height, strength, channels } = payload
 
     const workingPixels = Float32Array.from(rawData);
+
+    const distributeError = (
+        targetX: number, 
+        targetY: number, 
+        weight: number,
+        errorR: number,
+        errorG: number,
+        errorB: number
+    ) => {
+        if (targetX < 0 || targetX >= width || targetY >= height) return false;
+        
+        // const doneAlready = visited.find(v => v[0] === targetX && v[1] === targetY)
+
+        // if(doneAlready) return false
+
+        const targetOffset = channelOffset(targetX, targetY, width, channels);
+        if (rawData[targetOffset + 3] === 0) return false;
+
+        workingPixels[targetOffset] += errorR * weight * strength;
+        workingPixels[targetOffset + 1] += errorG * weight * strength;
+        workingPixels[targetOffset + 2] += errorB * weight * strength;
+
+        return true
+    };
 
     // Floyd-Steinberg dithering carries the colour not represented by one
     // palette pixel into neighbouring unprocessed pixels.
@@ -44,23 +71,12 @@ const fsDithering = async(payload: {
             rawData[offset + 1] = colorSelect[1];
             rawData[offset + 2] = colorSelect[2];
 
-            const distributeError = (targetX: number, targetY: number, weight: number) => {
-                if (targetX < 0 || targetX >= width || targetY >= height) return;
-
-                const targetOffset = channelOffset(targetX, targetY, width, channels);
-                if (rawData[targetOffset + 3] === 0) return;
-
-                workingPixels[targetOffset] += errorR * weight * strength;
-                workingPixels[targetOffset + 1] += errorG * weight * strength;
-                workingPixels[targetOffset + 2] += errorB * weight * strength;
-            };
-
-            distributeError(x + 1, y, 7 / 16);
-            distributeError(x - 1, y + 1, 3 / 16);
-            distributeError(x, y + 1, 5 / 16);
-            distributeError(x + 1, y + 1, 1 / 16);            
+            distributeError(x + 1, y, 7 / 16, errorR, errorG, errorB);
+            distributeError(x - 1, y + 1, 3 / 16, errorR, errorG, errorB);
+            distributeError(x, y + 1, 5 / 16, errorR, errorG, errorB);
+            distributeError(x + 1, y + 1, 1 / 16, errorR, errorG, errorB);    
         }
-    }    
+    }
 
     return rawData
 }
