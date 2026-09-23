@@ -4,7 +4,7 @@ import { getClosestColorIndex } from './color.ts';
 import matrix from '../config/matrix.ts';
 
 // OpenCV
-import { getOpenCv } from '../lib/opencv.js'
+import { getOpenCv } from '../lib/opencv.ts'
 
 const channelOffset = (x: number, y: number, outputWidth: number, outputChannels: number) =>
     (y * outputWidth + x) * outputChannels;
