@@ -1,10 +1,14 @@
 import { getClosestColorIndex } from './color.ts';
 
+import sharp from 'sharp';
+
 //bayerMatrix 
 import matrix from '../config/matrix.ts';
 
 // OpenCV
-import { getOpenCv } from '../lib/opencv.ts'
+import { getOpenCVsrc } from './convert.ts';
+import { applyContrast } from './contrast.ts';
+import { applyErode } from './erode.ts';
 
 const channelOffset = (x: number, y: number, outputWidth: number, outputChannels: number) =>
     (y * outputWidth + x) * outputChannels;
@@ -21,7 +25,23 @@ const fsDithering = async(payload: {
 }) => {
     const { color, rawData, width, height, strength, channels } = payload
 
-    const workingPixels = Float32Array.from(rawData);
+    const src = await getOpenCVsrc(rawData, width, height)
+
+    const dstContrast = await applyContrast(src)
+
+    const dstErode = await applyErode(dstContrast)
+    
+    const newBytes = await sharp(Buffer.from(dstErode.data), {
+                        raw: {
+                            width: width,
+                            height: height,
+                            channels: 4
+                        }
+                    })
+                    .ensureAlpha()
+                    .toBuffer();
+
+    const workingPixels = Float32Array.from(newBytes);
 
     const distributeError = (
         targetX: number, 
@@ -67,18 +87,22 @@ const fsDithering = async(payload: {
             const errorG = g - colorSelect[1];
             const errorB = b - colorSelect[2];          
             
-            rawData[offset] = colorSelect[0];
-            rawData[offset + 1] = colorSelect[1];
-            rawData[offset + 2] = colorSelect[2];
+            newBytes[offset] = colorSelect[0];
+            newBytes[offset + 1] = colorSelect[1];
+            newBytes[offset + 2] = colorSelect[2];
 
             distributeError(x + 1, y, 7 / 16, errorR, errorG, errorB);
             distributeError(x - 1, y + 1, 3 / 16, errorR, errorG, errorB);
             distributeError(x, y + 1, 5 / 16, errorR, errorG, errorB);
             distributeError(x + 1, y + 1, 1 / 16, errorR, errorG, errorB);    
         }
-    }
+    }  
 
-    return rawData
+    // Release memory
+    dstContrast.delete()
+    dstErode.delete()
+
+    return newBytes
 }
 
 const baDithering = async(payload: {
@@ -91,7 +115,23 @@ const baDithering = async(payload: {
 })=> {
     const { color, rawData, width, height, strength, channels } = payload
 
-    const workingPixels = Float32Array.from(rawData);
+    const src = await getOpenCVsrc(rawData, width, height)
+
+    const dstContrast = await applyContrast(src)
+
+    const dstErode = await applyErode(dstContrast)
+    
+    const newBytes = await sharp(Buffer.from(dstErode.data), {
+                        raw: {
+                            width: width,
+                            height: height,
+                            channels: 4
+                        }
+                    })
+                    .ensureAlpha()
+                    .toBuffer();
+
+    const workingPixels = Float32Array.from(newBytes);
 
     // Helper to safely add color error to neighboring pixels
     const addError = (x: number, y: number, errR: number, errG: number, errB: number) => {
@@ -123,9 +163,9 @@ const baDithering = async(payload: {
             const errorG = Math.floor((g - colorSelect[1]) / 8);
             const errorB = Math.floor((b - colorSelect[2]) / 8);              
             
-            rawData[offset] = colorSelect[0];
-            rawData[offset + 1] = colorSelect[1];
-            rawData[offset + 2] = colorSelect[2];
+            newBytes[offset] = colorSelect[0];
+            newBytes[offset + 1] = colorSelect[1];
+            newBytes[offset + 2] = colorSelect[2];
 
             // Diffuse the 1/8th error to the 6 Atkinson neighbors
             if (errorR !== 0 || errorG !== 0 || errorB !== 0) {  
@@ -139,7 +179,11 @@ const baDithering = async(payload: {
         }
     }    
 
-    return rawData    
+    // Release memory
+    dstContrast.delete()
+    dstErode.delete()    
+
+    return newBytes    
 }
 
 const ordered = async(payload: {
@@ -151,6 +195,22 @@ const ordered = async(payload: {
     strength: number
 }) => {
     const { color, rawData, width, height, channels, strength } = payload
+
+    const src = await getOpenCVsrc(rawData, width, height)
+
+    const dstContrast = await applyContrast(src)
+
+    const dstErode = await applyErode(dstContrast)
+    
+    const newBytes = await sharp(Buffer.from(dstErode.data), {
+                        raw: {
+                            width: width,
+                            height: height,
+                            channels: 4
+                        }
+                    })
+                    .ensureAlpha()
+                    .toBuffer();    
 
     for (let y = 0; y < height; y++) {
         for (let x = 0; x < width; x++) {
@@ -170,22 +230,22 @@ const ordered = async(payload: {
 
             // 2. Apply dither bias to the raw pixel channels
             // Clamp between 0-255 so we don't blow out color math
-            const r = Math.min(255, Math.max(0, rawData[offset]     + bias));
-            const g = Math.min(255, Math.max(0, rawData[offset + 1] + bias));
-            const b = Math.min(255, Math.max(0, rawData[offset + 2] + bias));                        
+            const r = Math.min(255, Math.max(0, newBytes[offset]     + bias));
+            const g = Math.min(255, Math.max(0, newBytes[offset + 1] + bias));
+            const b = Math.min(255, Math.max(0, newBytes[offset + 2] + bias));                        
 
 
             const colorIndex = getClosestColorIndex({ palette: color, r, g, b });
             const colorSelect = color[colorIndex];
 
-            rawData[offset] = colorSelect[0];
-            rawData[offset + 1] = colorSelect[1];
-            rawData[offset + 2] = colorSelect[2];            
+            newBytes[offset] = colorSelect[0];
+            newBytes[offset + 1] = colorSelect[1];
+            newBytes[offset + 2] = colorSelect[2];            
 
         }        
     }
 
-    return rawData
+    return newBytes
 }
 
 export {
