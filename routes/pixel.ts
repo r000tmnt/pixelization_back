@@ -46,13 +46,13 @@ router.post('/convert', async (req: Request, res: Response) => {
                     min = 256;
                 break;
                 case 4:
-                    min = 128;
+                    min = 170;
                 break;
                 case 6:
-                    min = 64;
+                    min = 113;
                 break;
                 case 8:
-                    min = 32;
+                    min = 75;
                 break;
             }
 
@@ -61,7 +61,7 @@ router.post('/convert', async (req: Request, res: Response) => {
             // Destructure width and height
             const { width, height } = metadata;
             
-            console.log(`Width: ${width}px, Height: ${height}px`);
+            // console.log(`Width: ${width}px, Height: ${height}px`);
 
             const isLandscape = width >= height;
 
@@ -72,6 +72,7 @@ router.post('/convert', async (req: Request, res: Response) => {
             const newHeight = isLandscape
                 ? Math.max(1, Math.round(min * (height / width)))
                 : min;
+            // console.log(`tempWidth: ${tempWidth}px, tempHeight: ${tempHeight}px`)
 
             if(palette && palette[0] && palette[0] !== 'original'){
                 // console.log(palette)
@@ -80,10 +81,10 @@ router.post('/convert', async (req: Request, res: Response) => {
                 
                 // if(customColors && customColors[0]){
                 
-                console.log('customColors', customColors)
+                // console.log('customColors', customColors)
 
                 if(customColors && customColors[0]){
-                    const customColorsArray = customColors[0].split(';').map((hex: string) => {
+                    customColors[0].split(';').map((hex: string) => {
                         // Parse the hex substrings into base-10 integers
                         const r = parseInt(hex.substring(1, 3), 16);
                         const g = parseInt(hex.substring(3, 5), 16);
@@ -98,9 +99,7 @@ router.post('/convert', async (req: Request, res: Response) => {
                 // console.log(color)
 
                 const rawBytes = await sharp(files.file[0].filepath, { failOn: 'none' })
-                // .resize({ width: newWidth, height: newHeight, kernel: sharp.kernel.nearest })
-                // .resize({ width: newWidth, height: newHeight, kernel: sharp.kernel.lanczos3 })
-                .resize({ width: newWidth, height: newHeight, fit: 'inside', kernel: sharp.kernel.lanczos3 })
+                .resize({ width: newWidth, height: newHeight, fit: 'inside',})
                 .ensureAlpha()
                 .raw()
                 .toBuffer({ resolveWithObject: true });
@@ -156,6 +155,7 @@ router.post('/convert', async (req: Request, res: Response) => {
                     break;
                 }
 
+                // 7. 使用 Sharp 將 OpenCV 的數據寫回圖片檔案                
                 await sharp(result, {
                     raw: {
                         width: rawBytes.info.width,
@@ -163,6 +163,7 @@ router.post('/convert', async (req: Request, res: Response) => {
                         channels: rawBytes.info.channels
                     }
                 })
+                // .resize({ width: newWidth, height: newHeight, fit: 'inside', kernel: sharp.kernel.nearest})
                 .png()
                 .toBuffer()
                 .then(async function (data) {
@@ -172,13 +173,12 @@ router.post('/convert', async (req: Request, res: Response) => {
                     let base64Encoded = data.toString("base64");
                     const url = `data:image/png;base64,${base64Encoded}`;
 
-                    res.status(200).send({ data: url, width: newWidth, height: newHeight });
+                    // res.status(200).send({ data: url, width: newWidth, height: newHeight });
+                    res.status(200).send({ data: url, width: rawBytes.info.width, height: rawBytes.info.height });
                 });                   
-                
-                // await fs.promises.writeFile("test.png", output);
             }else{
                 await sharp(files.file[0].filepath)
-                .resize({ width: newWidth, height: newHeight, kernel: sharp.kernel.nearest })
+                .resize({ width: newWidth, height: newHeight, fit: 'inside', kernel: sharp.kernel.lanczos3 })
                 // .toColourspace('rgb16')
                 .png()
                 .toBuffer()    
