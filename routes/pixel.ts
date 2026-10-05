@@ -25,6 +25,8 @@ router.post('/convert', async (req: Request, res: Response) => {
             pixelSize, 
             palette, 
             ditherStrength, 
+            erodeStrength,
+            contrastStrength,
             ditherStyle,
             customColors 
         } = fields;
@@ -108,7 +110,7 @@ router.post('/convert', async (req: Request, res: Response) => {
 
                 const { width: outputWidth, height: outputHeight, channels: outputChannels } = rawBytes.info;
 
-                const style = ditherStyle? ditherStyle[0] : 'errorDiffusion'
+                const style = ditherStyle? ditherStyle[0] : 'default'
 
                 let result: Buffer<ArrayBuffer>
 
@@ -120,6 +122,8 @@ router.post('/convert', async (req: Request, res: Response) => {
                             width: outputWidth,
                             height: outputHeight,
                             strength: Number(ditherStrength),
+                            erode: Number(erodeStrength),
+                            contrast: Number(contrastStrength),
                             channels: outputChannels
                         })                        
                     break;
@@ -130,6 +134,8 @@ router.post('/convert', async (req: Request, res: Response) => {
                             width: outputWidth,
                             height: outputHeight,
                             strength: Number(ditherStrength),
+                            erode: Number(erodeStrength),
+                            contrast: Number(contrastStrength),                            
                             channels: outputChannels
                         })                            
                     break;
@@ -140,6 +146,8 @@ router.post('/convert', async (req: Request, res: Response) => {
                             width: outputWidth,
                             height: outputHeight,               
                             channels: outputChannels,
+                            erode: Number(erodeStrength),
+                            contrast: Number(contrastStrength),                            
                             strength: Number(ditherStrength),         
                         })                        
                     break;
@@ -150,6 +158,8 @@ router.post('/convert', async (req: Request, res: Response) => {
                             width: outputWidth,
                             height: outputHeight,
                             strength: Number(ditherStrength),
+                            erode: Number(erodeStrength),
+                            contrast: Number(contrastStrength),                            
                             channels: outputChannels
                         })                          
                     break;
@@ -197,10 +207,10 @@ router.post('/convert', async (req: Request, res: Response) => {
         }
     } catch (err: any) {
         // example to check for a very specific error
-        if (err.code === formidableErrors.maxFieldsExceeded) {
+        // if (err.code === formidableErrors.maxFieldsExceeded) {
 
-        }
-        console.error(err);
+        // }
+        console.error('err: ', err);
         res.writeHead(err.httpCode || 400, { 'Content-Type': 'text/plain' });
         res.end(String(err));
         return;
