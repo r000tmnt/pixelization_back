@@ -1,7 +1,7 @@
 // OpenCV
 import { getOpenCv } from '../lib/opencv.ts'
 
-export const applyErode = async(src: any) => {
+export const applyErode = async(src: any, strength: number) => {
     const { cv } = await getOpenCv()
     console.log("OpenCV.js is ready!");
 
@@ -10,7 +10,10 @@ export const applyErode = async(src: any) => {
     // ====== 功能：Erode (腐蝕效果) ======
     // 建立結構元素 (Kernel)，通常是 3x3 或 5x5 的矩形
     // 核心尺寸越大，腐蝕（線條變細、白色縮小）的效果越劇烈
-    let E = cv.getStructuringElement(cv.MORPH_CROSS, new cv.Size(2, 2));
+    const volume = Math.round(strength / 3)
+    console.log(volume)
+    const size = strength < 1? 1 : strength + volume 
+    let E = cv.getStructuringElement(cv.MORPH_CROSS, new cv.Size(size, size));
     // let D = cv.getStructuringElement(cv.MORPH_CROSS, new cv.Size(1, 1));
 
     // 直接對「彩色原圖」執行腐蝕效果
