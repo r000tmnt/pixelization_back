@@ -1,14 +1,10 @@
 import { getClosestColorIndex } from './color.ts';
 
-import sharp from 'sharp';
-
 //bayerMatrix 
 import matrix from '../config/matrix.ts';
 
 // OpenCV
-import { getOpenCVsrc } from './convert.ts';
-import { applyContrast } from './contrast.ts';
-import { applyErode } from './erode.ts';
+import { alterSourceImage } from './convert.ts';
 
 const channelOffset = (x: number, y: number, outputWidth: number, outputChannels: number) =>
     (y * outputWidth + x) * outputChannels;
@@ -21,25 +17,13 @@ const fsDithering = async(payload: {
     width: number, 
     height: number,
     channels: number,
-    strength: number
+    strength: number,
+    erode?: number,
+    contrast?: number
 }) => {
-    const { color, rawData, width, height, strength, channels } = payload
-
-    const src = await getOpenCVsrc(rawData, width, height)
-
-    const dstContrast = await applyContrast(src)
-
-    const dstErode = await applyErode(dstContrast)
+    const { color, rawData, width, height, strength, channels, erode, contrast } = payload
     
-    const newBytes = await sharp(Buffer.from(dstErode.data), {
-                        raw: {
-                            width: width,
-                            height: height,
-                            channels: 4
-                        }
-                    })
-                    .ensureAlpha()
-                    .toBuffer();
+    const newBytes = await alterSourceImage(rawData, width, height, erode, contrast)
 
     const workingPixels = Float32Array.from(newBytes);
 
@@ -98,10 +82,6 @@ const fsDithering = async(payload: {
         }
     }  
 
-    // Release memory
-    dstContrast.delete()
-    dstErode.delete()
-
     return newBytes
 }
 
@@ -111,25 +91,13 @@ const baDithering = async(payload: {
     width: number, 
     height: number,
     channels: number,
-    strength: number    
+    strength: number,
+    erode?: number,
+    contrast?: number      
 })=> {
-    const { color, rawData, width, height, strength, channels } = payload
-
-    const src = await getOpenCVsrc(rawData, width, height)
-
-    const dstContrast = await applyContrast(src)
-
-    const dstErode = await applyErode(dstContrast)
+    const { color, rawData, width, height, strength, channels, erode, contrast } = payload
     
-    const newBytes = await sharp(Buffer.from(dstErode.data), {
-                        raw: {
-                            width: width,
-                            height: height,
-                            channels: 4
-                        }
-                    })
-                    .ensureAlpha()
-                    .toBuffer();
+    const newBytes = await alterSourceImage(rawData, width, height, erode, contrast)
 
     const workingPixels = Float32Array.from(newBytes);
 
@@ -177,11 +145,7 @@ const baDithering = async(payload: {
                 addError(x,     y + 2, errorR, errorG, errorB); // Two Down
              }                 
         }
-    }    
-
-    // Release memory
-    dstContrast.delete()
-    dstErode.delete()    
+    } 
 
     return newBytes    
 }
@@ -192,25 +156,13 @@ const ordered = async(payload: {
     width: number, 
     height: number,
     channels: number,
-    strength: number
+    strength: number,
+    erode?: number,
+    contrast?: number    
 }) => {
-    const { color, rawData, width, height, channels, strength } = payload
-
-    const src = await getOpenCVsrc(rawData, width, height)
-
-    const dstContrast = await applyContrast(src)
-
-    const dstErode = await applyErode(dstContrast)
+    const { color, rawData, width, height, strength, channels, erode, contrast } = payload
     
-    const newBytes = await sharp(Buffer.from(dstErode.data), {
-                        raw: {
-                            width: width,
-                            height: height,
-                            channels: 4
-                        }
-                    })
-                    .ensureAlpha()
-                    .toBuffer();    
+    const newBytes = await alterSourceImage(rawData, width, height, erode, contrast)
 
     for (let y = 0; y < height; y++) {
         for (let x = 0; x < width; x++) {
