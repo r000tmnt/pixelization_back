@@ -7,6 +7,7 @@ import {
     baDithering,
     ordered 
 } from '../utils/dithering.ts';
+import logger from '../utils/logger.ts';
 // import fs from 'fs'
 
 const router = express.Router();
@@ -106,7 +107,7 @@ router.post('/convert', async (req: Request, res: Response) => {
                 .raw()
                 .toBuffer({ resolveWithObject: true });
 
-                console.log('rawBytes', rawBytes.info)
+                logger.info('Image loaded for conversion', { image: rawBytes.info });
 
                 const { width: outputWidth, height: outputHeight, channels: outputChannels } = rawBytes.info;
 
@@ -210,7 +211,13 @@ router.post('/convert', async (req: Request, res: Response) => {
         // if (err.code === formidableErrors.maxFieldsExceeded) {
 
         // }
-        console.error('err: ', err);
+        logger.error('Image conversion failed', {
+            error: {
+                name: err instanceof Error ? err.name : 'Error',
+                message: err instanceof Error ? err.message : String(err),
+                stack: err instanceof Error ? err.stack : undefined,
+            },
+        });
         res.writeHead(err.httpCode || 400, { 'Content-Type': 'text/plain' });
         res.end(String(err));
         return;
