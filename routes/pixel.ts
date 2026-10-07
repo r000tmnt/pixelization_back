@@ -102,6 +102,7 @@ router.post('/convert', async (req: Request, res: Response) => {
                 // console.log(color)
 
                 const rawBytes = await sharp(files.file[0].filepath, { failOn: 'none' })
+                .autoOrient()
                 .resize({ width: newWidth, height: newHeight, fit: 'inside',})
                 .ensureAlpha()
                 .raw()
@@ -188,9 +189,20 @@ router.post('/convert', async (req: Request, res: Response) => {
                     res.status(200).send({ data: url, width: rawBytes.info.width, height: rawBytes.info.height });
                 });                   
             }else{
-                await sharp(files.file[0].filepath)
-                .resize({ width: newWidth, height: newHeight, fit: 'inside', kernel: sharp.kernel.lanczos3 })
-                // .toColourspace('rgb16')
+                const rawBytes = await sharp(files.file[0].filepath, { failOn: 'none' })
+                                .autoOrient()
+                                .resize({ width: newWidth, height: newHeight, fit: 'inside', kernel: sharp.kernel.lanczos3})
+                                .ensureAlpha()
+                                .raw()
+                                .toBuffer({ resolveWithObject: true });
+
+                await sharp(rawBytes.data, {
+                    raw: {
+                        width: rawBytes.info.width,
+                        height: rawBytes.info.height,
+                        channels: rawBytes.info.channels
+                    }
+                })
                 .png()
                 .toBuffer()    
                 .then(async function (data) {
@@ -200,7 +212,7 @@ router.post('/convert', async (req: Request, res: Response) => {
                     let base64Encoded = data.toString("base64");
                     const url = `data:image/png;base64,${base64Encoded}`;
 
-                    res.status(200).send({ data: url, width: newWidth, height: newHeight });
+                    res.status(200).send({ data: url, width: rawBytes.info.width, height: rawBytes.info.height });
                 });                
             }
 
