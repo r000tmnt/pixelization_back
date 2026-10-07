@@ -3,7 +3,7 @@ import { getOpenCv } from '../lib/opencv.ts'
 
 export const applyContrast = async(src: any, strength: number) => {
     const { cv } = await getOpenCv()
-    console.log("OpenCV.js is ready!");
+    // console.log("OpenCV.js is ready!");
 
     let dstRGBA = new cv.Mat();
     let bgr = new cv.Mat();

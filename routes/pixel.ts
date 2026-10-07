@@ -7,6 +7,7 @@ import {
     baDithering,
     ordered 
 } from '../utils/dithering.ts';
+import logger from '../utils/logger.ts';
 // import fs from 'fs'
 
 const router = express.Router();
@@ -101,12 +102,13 @@ router.post('/convert', async (req: Request, res: Response) => {
                 // console.log(color)
 
                 const rawBytes = await sharp(files.file[0].filepath, { failOn: 'none' })
+                .autoOrient()
                 .resize({ width: newWidth, height: newHeight, fit: 'inside',})
                 .ensureAlpha()
                 .raw()
                 .toBuffer({ resolveWithObject: true });
 
-                console.log('rawBytes', rawBytes.info)
+                logger.info('Image loaded for conversion', { image: rawBytes.info });
 
                 const { width: outputWidth, height: outputHeight, channels: outputChannels } = rawBytes.info;
 
@@ -187,9 +189,20 @@ router.post('/convert', async (req: Request, res: Response) => {
                     res.status(200).send({ data: url, width: rawBytes.info.width, height: rawBytes.info.height });
                 });                   
             }else{
-                await sharp(files.file[0].filepath)
-                .resize({ width: newWidth, height: newHeight, fit: 'inside', kernel: sharp.kernel.lanczos3 })
-                // .toColourspace('rgb16')
+                const rawBytes = await sharp(files.file[0].filepath, { failOn: 'none' })
+                                .autoOrient()
+                                .resize({ width: newWidth, height: newHeight, fit: 'inside', kernel: sharp.kernel.lanczos3})
+                                .ensureAlpha()
+                                .raw()
+                                .toBuffer({ resolveWithObject: true });
+
+                await sharp(rawBytes.data, {
+                    raw: {
+                        width: rawBytes.info.width,
+                        height: rawBytes.info.height,
+                        channels: rawBytes.info.channels
+                    }
+                })
                 .png()
                 .toBuffer()    
                 .then(async function (data) {
@@ -199,7 +212,7 @@ router.post('/convert', async (req: Request, res: Response) => {
                     let base64Encoded = data.toString("base64");
                     const url = `data:image/png;base64,${base64Encoded}`;
 
-                    res.status(200).send({ data: url, width: newWidth, height: newHeight });
+                    res.status(200).send({ data: url, width: rawBytes.info.width, height: rawBytes.info.height });
                 });                
             }
 
@@ -210,7 +223,13 @@ router.post('/convert', async (req: Request, res: Response) => {
         // if (err.code === formidableErrors.maxFieldsExceeded) {
 
         // }
-        console.error('err: ', err);
+        logger.error('Image conversion failed', {
+            error: {
+                name: err instanceof Error ? err.name : 'Error',
+                message: err instanceof Error ? err.message : String(err),
+                stack: err instanceof Error ? err.stack : undefined,
+            },
+        });
         res.writeHead(err.httpCode || 400, { 'Content-Type': 'text/plain' });
         res.end(String(err));
         return;
