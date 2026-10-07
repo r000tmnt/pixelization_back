@@ -1,6 +1,6 @@
 {
   "name": "pixelization_back",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "description": "API for Web-based pixel art converter / tool",
   "keywords": [
     "nodejs",
