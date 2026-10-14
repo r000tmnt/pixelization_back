@@ -115,6 +115,8 @@ router.post('/convert', async (req: Request, res: Response) => {
                 const style = ditherStyle? ditherStyle[0] : 'default'
 
                 let result: Buffer<ArrayBuffer>
+                const paletteIndices = new Uint8Array(outputWidth * outputHeight)
+                paletteIndices.fill(255)
 
                 switch(style){
                     case 'default':
@@ -126,7 +128,8 @@ router.post('/convert', async (req: Request, res: Response) => {
                             strength: Number(ditherStrength),
                             erode: Number(erodeStrength),
                             contrast: Number(contrastStrength),
-                            channels: outputChannels
+                            channels: outputChannels,
+                            paletteIndices
                         })                        
                     break;
                     case 'matted':
@@ -138,7 +141,8 @@ router.post('/convert', async (req: Request, res: Response) => {
                             strength: Number(ditherStrength),
                             erode: Number(erodeStrength),
                             contrast: Number(contrastStrength),                            
-                            channels: outputChannels
+                            channels: outputChannels,
+                            paletteIndices
                         })                            
                     break;
                     case 'grid':
@@ -151,6 +155,7 @@ router.post('/convert', async (req: Request, res: Response) => {
                             erode: Number(erodeStrength),
                             contrast: Number(contrastStrength),                            
                             strength: Number(ditherStrength),         
+                            paletteIndices,
                         })                        
                     break;
                     default:
@@ -162,9 +167,38 @@ router.post('/convert', async (req: Request, res: Response) => {
                             strength: Number(ditherStrength),
                             erode: Number(erodeStrength),
                             contrast: Number(contrastStrength),                            
-                            channels: outputChannels
+                            channels: outputChannels,
+                            paletteIndices
                         })                          
                     break;
+                }
+
+                const usedPalette: number[][] = []
+                const paletteIndexByColor = new Map<string, number>()
+                const compactIndexByPaletteIndex = new Uint8Array(color.length)
+                compactIndexByPaletteIndex.fill(255)
+
+                for (let pixel = 0; pixel < paletteIndices.length; pixel++) {
+                    const paletteIndex = paletteIndices[pixel]!
+                    if (paletteIndex === 255) continue
+
+                    let compactIndex = compactIndexByPaletteIndex[paletteIndex]!
+                    if (compactIndex === 255) {
+                        const channels = color[paletteIndex]
+                        if (!channels) continue
+                        const normalized = channels.map((channel) => Math.max(0, Math.min(255, Math.round(channel))))
+                        const key = normalized.join(',')
+                        const existingIndex = paletteIndexByColor.get(key)
+                        if (existingIndex !== undefined) {
+                            compactIndex = existingIndex
+                        } else {
+                            compactIndex = usedPalette.length
+                            usedPalette.push(normalized)
+                            paletteIndexByColor.set(key, compactIndex)
+                        }
+                        compactIndexByPaletteIndex[paletteIndex] = compactIndex
+                    }
+                    paletteIndices[pixel] = compactIndex
                 }
 
                 // 7. 使用 Sharp 將 OpenCV 的數據寫回圖片檔案                
@@ -186,7 +220,13 @@ router.post('/convert', async (req: Request, res: Response) => {
                     const url = `data:image/png;base64,${base64Encoded}`;
 
                     // res.status(200).send({ data: url, width: newWidth, height: newHeight });
-                    res.status(200).send({ data: url, width: rawBytes.info.width, height: rawBytes.info.height });
+                    res.status(200).send({
+                        data: url,
+                        width: rawBytes.info.width,
+                        height: rawBytes.info.height,
+                        palette: usedPalette,
+                        paletteIndexMap: Buffer.from(paletteIndices).toString('base64')
+                    });
                 });                   
             }else{
                 const rawBytes = await sharp(files.file[0].filepath, { failOn: 'none' })

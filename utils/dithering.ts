@@ -18,10 +18,11 @@ const fsDithering = async(payload: {
     height: number,
     channels: number,
     strength: number,
+    paletteIndices?: Uint8Array,
     erode?: number,
     contrast?: number
 }) => {
-    const { color, rawData, width, height, strength, channels, erode, contrast } = payload
+    const { color, rawData, width, height, strength, channels, paletteIndices, erode, contrast } = payload
     
     const newBytes = await alterSourceImage(rawData, width, height, erode, contrast)
 
@@ -74,6 +75,7 @@ const fsDithering = async(payload: {
             newBytes[offset] = colorSelect[0];
             newBytes[offset + 1] = colorSelect[1];
             newBytes[offset + 2] = colorSelect[2];
+            if (paletteIndices) paletteIndices[y * width + x] = colorIndex;
 
             distributeError(x + 1, y, 7 / 16, errorR, errorG, errorB);
             distributeError(x - 1, y + 1, 3 / 16, errorR, errorG, errorB);
@@ -92,10 +94,11 @@ const baDithering = async(payload: {
     height: number,
     channels: number,
     strength: number,
+    paletteIndices?: Uint8Array,
     erode?: number,
     contrast?: number      
 })=> {
-    const { color, rawData, width, height, strength, channels, erode, contrast } = payload
+    const { color, rawData, width, height, strength, channels, paletteIndices, erode, contrast } = payload
     
     const newBytes = await alterSourceImage(rawData, width, height, erode, contrast)
 
@@ -134,6 +137,7 @@ const baDithering = async(payload: {
             newBytes[offset] = colorSelect[0];
             newBytes[offset + 1] = colorSelect[1];
             newBytes[offset + 2] = colorSelect[2];
+            if (paletteIndices) paletteIndices[y * width + x] = colorIndex;
 
             // Diffuse the 1/8th error to the 6 Atkinson neighbors
             if (errorR !== 0 || errorG !== 0 || errorB !== 0) {  
@@ -157,10 +161,11 @@ const ordered = async(payload: {
     height: number,
     channels: number,
     strength: number,
+    paletteIndices?: Uint8Array,
     erode?: number,
     contrast?: number    
 }) => {
-    const { color, rawData, width, height, strength, channels, erode, contrast } = payload
+    const { color, rawData, width, height, strength, channels, paletteIndices, erode, contrast } = payload
     
     const newBytes = await alterSourceImage(rawData, width, height, erode, contrast)
 
@@ -193,6 +198,7 @@ const ordered = async(payload: {
             newBytes[offset] = colorSelect[0];
             newBytes[offset + 1] = colorSelect[1];
             newBytes[offset + 2] = colorSelect[2];            
+            if (paletteIndices) paletteIndices[y * width + x] = colorIndex;
 
         }        
     }
