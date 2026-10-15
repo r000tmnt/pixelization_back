@@ -8,7 +8,21 @@ const app: Express = express();
 
 const port = Number(process.env.PORT) || 3030;
 
-app.use(cors());
+const url = String(process.env.APP_MODE === 'dev'? process.env.LOCAL_URL : process.env.TEST_URL);
+
+const allowedOrigins = new Set([url]);
+
+app.use(cors({
+  origin(origin, callback) {
+    // Requests without an Origin header are typically server-to-server.
+    if (!origin || allowedOrigins.has(origin)) {
+      callback(null, true);
+      return;
+    }
+
+    callback(new Error('Origin not allowed by CORS'));
+  },
+}));
 app.use((req, res, next) => {
   const startedAt = Date.now();
   res.on('finish', () => {
